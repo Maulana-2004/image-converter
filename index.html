@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Image Converter</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    :root {
+      --white: #ffffff;
+      --black: #000000;
+      --gray-light: #f5f5f5;
+      --gray-medium: #cccccc;
+      --gray-dark: #333333;
+      --accent: #555555;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', sans-serif;
+    }
+
+    body {
+      background-color: var(--gray-light);
+      color: var(--gray-dark);
+      padding: 2rem;
+      text-align: center;
+    }
+
+    header {
+      margin-bottom: 2rem;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      color: var(--black);
+      margin-bottom: 0.5rem;
+    }
+
+    .myConverterContainer {
+      background: var(--white);
+      border-radius: 15px;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+      width: 100%;
+      max-width: 420px;
+      margin: auto;
+      padding: 2rem;
+    }
+
+    .drop-zone {
+      border: 2px dashed var(--gray-medium);
+      padding: 2rem;
+      border-radius: 12px;
+      background-color: var(--gray-light);
+      color: var(--accent);
+      font-size: 1.1rem;
+      margin-bottom: 1rem;
+      transition: all 0.3s;
+    }
+
+    .drop-zone:hover {
+      background-color: #e0e0e0;
+      border-color: var(--gray-dark);
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .image-preview {
+      margin: 1rem 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .image-preview img {
+      max-width: 100px;
+      max-height: 100px;
+      border-radius: 10px;
+      object-fit: cover;
+      border: 2px solid var(--gray-medium);
+    }
+
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    select {
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      border: 1px solid var(--gray-medium);
+      background: var(--white);
+      color: var(--gray-dark);
+      font-weight: 500;
+    }
+
+    button {
+      padding: 0.6rem 1.2rem;
+      border: none;
+      border-radius: 10px;
+      background: var(--gray-dark);
+      color: var(--white);
+      font-weight: bold;
+      transition: background 0.3s;
+      font-size: 1rem;
+    }
+
+    button:hover {
+      background: #000000;
+    }
+
+    #restart-btn {
+      background-color: var(--accent);
+    }
+
+    #restart-btn:hover {
+      background-color: #444;
+    }
+
+    @media (max-width: 600px) {
+      .myConverterContainer {
+        padding: 1.5rem;
+      }
+
+      .controls {
+        flex-direction: column;
+      }
+
+      .image-preview img {
+        max-width: 80px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Image Converter</h1>
+    <p>Made with 💖 By: AXMR97</p>
+  </header>
+
+  <div class="myConverterContainer">
+    <label class="drop-zone" for="file-input">
+      <i class="fas fa-cloud-upload-alt"></i> Drag & Drop or Click to Upload
+    </label>
+    <input type="file" id="file-input" accept="image/*" multiple />
+    <div class="image-preview" id="image-preview"></div>
+
+    <div class="controls">
+      <label>Convert to:</label>
+      <select id="format-select">
+        <option value="png">PNG</option>
+        <option value="jpg">JPG</option>
+        <option value="jpeg">JPEG</option>
+        <option value="gif">GIF</option>
+        <option value="webp">WEBP</option>
+        <option value="ico">ICO</option>
+        <option value="avif">AVIF</option>
+      </select>
+      <button id="convert-btn"><i class="fas fa-magic"></i> Convert & Download</button>
+      <button id="restart-btn"><i class="fas fa-redo"></i> Restart</button>
+    </div>
+  </div>
+
+  <script>
+    const fileInput = document.getElementById("file-input");
+    const imagePreview = document.getElementById("image-preview");
+    const convertBtn = document.getElementById("convert-btn");
+    const restartBtn = document.getElementById("restart-btn");
+    const formatSelect = document.getElementById("format-select");
+
+    let files = [];
+
+    fileInput.addEventListener("change", (e) => {
+      files = Array.from(e.target.files);
+      previewImages(files);
+    });
+
+    restartBtn.addEventListener("click", () => {
+      files = [];
+      fileInput.value = "";
+      imagePreview.innerHTML = "";
+    });
+
+    function previewImages(files) {
+      imagePreview.innerHTML = "";
+      files.forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const img = document.createElement("img");
+          img.src = reader.result;
+          imagePreview.appendChild(img);
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    convertBtn.addEventListener("click", async () => {
+      if (!files.length) return alert("Please upload some images first!");
+
+      const zip = new JSZip();
+      const format = formatSelect.value;
+
+      for (const file of files) {
+        const img = await createImageBitmap(file);
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+
+        const blob = await new Promise((resolve) =>
+          canvas.toBlob(resolve, `image/${format}`)
+        );
+
+        zip.file(
+          file.name.replace(/\.[^/.]+$/, "") + `.${format}`,
+          blob
+        );
+      }
+
+      zip.generateAsync({ type: "blob" }).then((blob) => {
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+
+        const now = new Date();
+        const pad = (n) => n.toString().padStart(2, "0");
+        const tanggal = [pad(now.getDate()), pad(now.getMonth() + 1), now.getFullYear()].join("-");
+        const waktu = [pad(now.getHours()), pad(now.getMinutes())].join(".");
+        const namaFile = `maull-${tanggal}__${waktu}.zip`;
+
+        link.download = namaFile;
+        link.click();
+      });
+    });
+  </script>
+</body>
+</html>
